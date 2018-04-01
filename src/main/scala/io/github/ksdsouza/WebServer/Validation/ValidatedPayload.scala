@@ -1,13 +1,12 @@
 package io.github.ksdsouza.WebServer.Validation
 
-import java.util
-
 import com.fasterxml.jackson.databind.node.JsonNodeType
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.twitter.finagle.http
 import com.twitter.finagle.http.{Method, Request}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success, Try}
 
 class ValidatedPayload private(season: String, year: Int, anime: List[Anime])
@@ -60,20 +59,17 @@ object ValidatedPayload {
     val animeJson = getAnime(requestJSON)
     if(animeJson == null) return Left("Payload must include key anime with Array of Anime as value")
 
-    val animeList = populateList(new util.ArrayList[Anime](), animeJson.elements.asScala.toList, requireAllAnimeFields)
+    val animeList = populateList(new ListBuffer[Anime], animeJson.elements.asScala.toList, requireAllAnimeFields)
     if(animeList.isLeft) new Left(animeList.left.get)
     else new Right(new ValidatedPayload(season, year, animeList.right.get))
   }
 
-  private def populateList(list: util.ArrayList[Anime], jsonnodeList: List[JsonNode], requireAll: Boolean = true): Either[String, List[Anime]] ={
-    if(jsonnodeList.isEmpty) new Right(list.asScala.toList)
-    else{
-      val animeEither = Anime.apply(jsonnodeList.head, requireAll)
-      if(animeEither.isLeft) new Left(animeEither.left.get)
-      else{
-        list.add(animeEither.right.get)
-        populateList(list, jsonnodeList.tail, requireAll)
-      }
-    }
-  }
+  private def populateList(list: ListBuffer[Anime],
+                           jsonnodeList: List[JsonNode],
+                           requireAll: Boolean = true): Either[String, List[Anime]] =
+    if(jsonnodeList.isEmpty) Right(list.toList)
+    else Anime.apply(jsonnodeList.head, requireAll).fold(
+      left => Left(left),
+      right => populateList(list += right, jsonnodeList.tail, requireAll)
+    )
 }
