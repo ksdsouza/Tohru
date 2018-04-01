@@ -7,7 +7,7 @@ import io.github.ksdsouza.WebServer.Routing.{GetRouter, PostRouter, PutRouter}
 
 object TohruAPI extends Service[http.Request, http.Response]{
 
-  implicit class ExtendedInt(val response: http.Response) {
+  implicit class ExtendedResponse(val response: http.Response) {
     def withContentString(contentString:String) = {
       response.setContentString(contentString)
       response
