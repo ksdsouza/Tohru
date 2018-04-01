@@ -1,4 +1,4 @@
-package io.github.ksdsouza.WebServer
+package io.github.ksdsouza.WebServer.Util
 
 import java.io.FileInputStream
 import java.util.Properties

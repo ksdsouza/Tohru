@@ -1,35 +1,18 @@
 package io.github.ksdsouza.WebServer
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.stream.ActorMaterializer
-import org.mongodb.scala.MongoClient
+import com.twitter.finagle.{Http, Service}
+import com.twitter.finagle.http
+import com.twitter.util.{Await, Future}
 
-import scala.io.StdIn
+class WebServer {
 
-object MainRouter {
-  val routes = GetRouter.route
+  val server = Http.serve(":8085", TohruAPI)
+  Await.ready(server)
+
 }
 
-object WebServer {
-  def main(args: Array[String]) {
-    implicit val system = ActorSystem("my-system")
-
-    def onComplete(): Unit = {
-      client.close()
-      system.terminate()
-    }
-
-    implicit val materializer = ActorMaterializer()
-    // needed for the future flatMap/onComplete in the end
-    implicit val executionContext = system.dispatcher
-
-    val bindingFuture = Http().bindAndHandle(MainRouter.routes, PropertyReader.ServerURL, PropertyReader.ServerPort)
-
-    println(s"Server online at http://${PropertyReader.ServerURL}:${PropertyReader.ServerPort}/\nPress RETURN to stop...")
-    StdIn.readLine() // let it run until user presses return
-    bindingFuture
-      .flatMap(_.unbind()) // trigger unbinding from the port
-      .onComplete(_ => onComplete()) // and shutdown when done
+object Main {
+  def main(args: Array[String]): Unit = {
+    new WebServer
   }
 }
