@@ -9,7 +9,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success, Try}
 
-class ValidatedPayload private(season: String, year: Int, anime: List[Anime])
+class ValidatedPayload private(val season: String, val year: Int, val anime: List[Anime])
 
 object ValidatedPayload {
 

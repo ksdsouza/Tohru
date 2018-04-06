@@ -1,19 +1,11 @@
 package io.github.ksdsouza.WebServer
 
+import com.twitter.finagle.http
 import com.twitter.finagle.http.Method
-import com.twitter.finagle.{Service, http}
 import com.twitter.util.Future
-import io.github.ksdsouza.WebServer.Routing.{GetRouter, PostRouter, PutRouter}
+import io.github.ksdsouza.WebServer.Routing.{GetRouter, PostRouter, PutRouter, Router}
 
-object TohruAPI extends Service[http.Request, http.Response]{
-
-  implicit class ExtendedResponse(val response: http.Response) {
-    def withContentString(contentString:String) = {
-      response.setContentString(contentString)
-      response
-    }
-  }
-
+object TohruAPI extends Router {
   def apply(request: http.Request): Future[http.Response] = request.method match {
       case Method.Get => GetRouter.apply(request)
       case Method.Post => PostRouter.apply(request)

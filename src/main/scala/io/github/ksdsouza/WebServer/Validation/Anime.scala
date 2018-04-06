@@ -5,8 +5,8 @@ import java.util
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import scala.collection.JavaConverters._
 
-class Anime private (title: String,
-                    numEps: Option[String] = None,
+class Anime private (val title: String,
+                     numEps: Option[String] = None,
                     imgUrl: Option[String] = None,
                     releaseDate: Option[String] = None,
                     synopsis: Option[String] = None,
