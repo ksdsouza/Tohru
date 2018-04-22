@@ -17,8 +17,13 @@ lazy val api = (project in file("."))
       "org.mongodb.scala" %% "mongo-scala-driver" % "2.2.1",
       "com.fasterxml.jackson.core" % "jackson-databind" % "2.4.0",
       "com.twitter" %% "twitter-server" % "18.1.0",
-      "com.twitter" %% "finagle-serversets" % "18.1.0",
+      "com.twitter" %% "finagle-serversets" % "18.3.0",
       "com.twitter" %% "finagle-http" % "18.3.0",
+      "com.twitter" %% "bijection-core" % "0.9.6",
+      "com.github.finagle" %% "finch-core" % "0.18.1",
+      "com.github.finagle" %% "finch-circe" % "0.18.1",
+      "io.circe" %% "circe-generic" % "0.9.3",
+      "io.circe" %% "circe-core" % "0.9.3"
     )
   )
 
@@ -27,7 +32,7 @@ lazy val api = (project in file("."))
   )
 
 assemblyMergeStrategy in assembly := {
-  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case PathList("META-INF", xs@_*) => MergeStrategy.discard
   case x => MergeStrategy.first
 }
 

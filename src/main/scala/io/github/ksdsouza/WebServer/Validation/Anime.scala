@@ -3,26 +3,32 @@ package io.github.ksdsouza.WebServer.Validation
 import java.util
 
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+
 import scala.collection.JavaConverters._
 
-class Anime private (val title: String,
-                     numEps: Option[String] = None,
+
+class Anime private(val title: String,
+                    numEps: Option[String] = None,
                     imgUrl: Option[String] = None,
                     releaseDate: Option[String] = None,
                     synopsis: Option[String] = None,
                     genres: Option[List[String]] = None) {
 
-  def this(title: String, numEps: String, imgUrl: String, releaseDate: String, synopsis: String, genres: List[String]) =
+  private def this(title: String, numEps: String, imgUrl: String, releaseDate: String, synopsis: String, genres: List[String]) =
     this(title, Some(numEps), Some(imgUrl), Some(releaseDate), Some(synopsis), Some(genres))
+
+  private def this(pAnime: PUTAnime) = this(pAnime.title, pAnime.numEps, pAnime.imgUrl, pAnime.release, pAnime.synopsis, pAnime.genres.toList)
+
+  private def this(pAnime: POSTAnime) = this(pAnime.title, pAnime.numEps, pAnime.imgUrl, pAnime.release, pAnime.synopsis, pAnime.genres.map(_.toList))
 
   val json = new ObjectMapper().createObjectNode()
   json.put("title", title)
 
-  if(numEps.isDefined) json.put("numEps", numEps.get)
-  if(imgUrl.isDefined) json.put("imgUrl", imgUrl.get)
-  if(releaseDate.isDefined) json.put("releaseDate", releaseDate.get)
-  if(synopsis.isDefined) json.put("synopsis", synopsis.get)
-  if(genres.isDefined) {
+  if (numEps.isDefined) json.put("numEps", numEps.get)
+  if (imgUrl.isDefined) json.put("imgUrl", imgUrl.get)
+  if (releaseDate.isDefined) json.put("releaseDate", releaseDate.get)
+  if (synopsis.isDefined) json.put("synopsis", synopsis.get)
+  if (genres.isDefined) {
     val genresJson = json.putArray("genres")
     genres.get.foreach(g => genresJson.add(g))
   }
@@ -31,10 +37,13 @@ class Anime private (val title: String,
 object Anime {
 
   private def checkFields(animeNode: JsonNode, fields: List[String]): Option[String] =
-    if(fields.isEmpty) None
+    if (fields.isEmpty) None
     else if (animeNode.has(fields.head)) checkFields(animeNode, fields.tail)
     else Some(s"Anime requires field: ${fields.head}")
 
+  def apply(pAnime: PUTAnime) = new Anime(pAnime)
+
+  def apply(pAnime: POSTAnime) = new Anime(pAnime)
 
   def apply(animeNode: JsonNode, requireAll: Boolean = true): Either[String, Anime] = {
     val allFieldsPresent = checkFields(animeNode, List("title"))

@@ -1,75 +1,73 @@
 package io.github.ksdsouza.WebServer.Validation
 
-import com.fasterxml.jackson.databind.node.JsonNodeType
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
-import com.twitter.finagle.http
-import com.twitter.finagle.http.{Method, Request}
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.bson.Document
+import org.bson.conversions.Bson
+import org.mongodb.scala.bson
+import org.mongodb.scala.bson.collection.immutable.Document
+import org.mongodb.scala.bson.conversions
+import org.mongodb.scala.model.Updates._
 
-import scala.collection.JavaConverters._
-import scala.collection.mutable.ListBuffer
-import scala.util.{Failure, Success, Try}
+import scala.collection.mutable.ArrayBuffer
 
-class ValidatedPayload private(val season: String, val year: Int, val anime: List[Anime])
+case class PUTAnime(title: String, numEps: String, imgUrl: String, release: String, synopsis: String, genres: Array[String]) {
+  def asAnime = Anime.apply(this)
+}
 
-object ValidatedPayload {
+case class POSTAnime(title: String, numEps: Option[String], imgUrl: Option[String], release: Option[String], synopsis: Option[String], genres: Option[Array[String]]){
+  def asAnime = Anime.apply(this)
 
-  def getSeason(seasonNum: Int): String = seasonNum match {
-    case 0 => "fall"
-    case 1 => "winter"
-    case 2 => "spring"
-    case 3 => "summer"
-  }
+  private def otherToSet(key: String, field: Option[String]) = if (field.isDefined) set(key, field.get) else null
+  private def listToSet(key: String, field: Option[Array[String]]) =
+    if (field.isDefined && field.get.size > 0) {
+      val f = field.get
+      f.foldRight(push(key,f.head))((current, accumulator) => combine(accumulator, push(key, current)))
+    }
+    else null
 
-  def apply(request: http.Request): Either[String, ValidatedPayload] = apply(request, request.method)
+  def titleAsUpdate = set("title", title)
 
-  def apply(request: http.Request, method: Method): Either[String, ValidatedPayload] = method match {
-    case Method.Put => PUTValidation(request)
-    case Method.Post => POSTValidation(request)
-    case _ => new Left("Invalid method supplied")
-  }
+  def numEpsAsUpdate = otherToSet("numEps", numEps)
 
-  private def PUTValidation(request: http.Request):Either[String, ValidatedPayload] = validate(request, true)
+  def imgUrlAsUpdate = otherToSet("imgUrl", imgUrl)
 
-  private def POSTValidation(request: Request): Either[String, ValidatedPayload] = validate(request, false)
+  def releaseAsUpdate = otherToSet("release", release)
 
-  private def validate(request: http.Request, requireAllAnimeFields: Boolean = true): Either[String, ValidatedPayload] = {
+  def synopsisAsUpdate = otherToSet("synopsis", synopsis)
 
-    def getField[A, B](requestTry: Try[A], right: A => B, predicate: A => Boolean, failure: B): B = requestTry match {
-      case Success(i) => if (predicate(i)) right(i) else failure
-      case Failure(e) => failure
+  def genresAsUpdate = listToSet("genres", genres)
+
+  def getAllUpdates = {
+    val titleSet = titleAsUpdate
+    val numEpsSet = numEpsAsUpdate
+    val imgUrlSet = imgUrlAsUpdate
+    val releaseSet = releaseAsUpdate
+    val synopsisSet = synopsisAsUpdate
+    val genresSet = genresAsUpdate
+
+    val updates = new ArrayBuffer[Bson]()
+
+    if(numEpsSet != null) updates += numEpsSet
+    if(imgUrlSet != null) updates += imgUrlSet
+    if(releaseSet != null) updates += releaseSet
+    if(synopsisSet != null) updates += synopsisSet
+    if(genresSet != null) {
+      val arrayNode = new ObjectMapper().createArrayNode()
+      genres.get.foreach(arrayNode.add)
+      updates += set("genres", arrayNode.toString)
+//      updates += set("genres", genres.get)
     }
 
-    def getSeason(requestJson: JsonNode): String = getField(Try(requestJson.get("season").asInt), ValidatedPayload.getSeason(_),
-      (i: Int) => (0 <= i && i <= 3), "")
-
-    def getYear(requestJson: JsonNode): Int = getField(Try(requestJson.get("year").asInt), (i: Int) => i, (i: Int) => i >= 0, -1)
-
-    def getAnime(requestJSON: JsonNode): JsonNode = getField(Try(requestJSON.get("anime")), (i: JsonNode) => i,
-      (animeJSON: JsonNode) => animeJSON != null && animeJSON.getNodeType == JsonNodeType.ARRAY,  null)
-
-    val requestJSON = Try(new ObjectMapper().readTree(request.getContentString)).getOrElse(null)
-    if(requestJSON == null) return Left("Request payload is not valid JSON")
-
-    val season = getSeason(requestJSON)
-    if(season.isEmpty) return Left("Payload must include key season with Int value between 0 and 3")
-
-    val year = getYear(requestJSON)
-    if (year == -1) return Left("Payload must include key year with positive Int value")
-
-    val animeJson = getAnime(requestJSON)
-    if(animeJson == null) return Left("Payload must include key anime with Array of Anime as value")
-
-    val animeList = populateList(new ListBuffer[Anime], animeJson.elements.asScala.toList, requireAllAnimeFields)
-    if(animeList.isLeft) new Left(animeList.left.get)
-    else new Right(new ValidatedPayload(season, year, animeList.right.get))
+    val r = updates.foldRight(titleSet)((current, accumulation) => combine(accumulation, current))
+    println(r)
+    r
   }
+}
 
-  private def populateList(list: ListBuffer[Anime],
-                           jsonnodeList: List[JsonNode],
-                           requireAll: Boolean = true): Either[String, List[Anime]] =
-    if(jsonnodeList.isEmpty) Right(list.toList)
-    else Anime.apply(jsonnodeList.head, requireAll).fold(
-      left => Left(left),
-      right => populateList(list += right, jsonnodeList.tail, requireAll)
-    )
+case class PUTValidatedPayload(val season: String, val year: Int, val anime: Array[PUTAnime]) {
+  def asList = anime.toList
+}
+
+case class POSTValidatedPayload(season: String, year: Int, anime: Array[POSTAnime]) {
+  def asList = anime.toList
 }
