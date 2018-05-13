@@ -1,8 +1,5 @@
 package io.github.ksdsouza.WebServer.Routing
 
-
-
-
 import com.twitter.finagle.http.{Response, Status}
 import io.circe.generic.auto._
 import io.finch._
@@ -17,10 +14,10 @@ import scala.concurrent.Future
 object PostEndpoint {
   val updateGivenAnime: Endpoint[Response] = post("services" :: "tohru" :: "update" :: jsonBody[POSTValidatedPayload]) {
     (animeList: POSTValidatedPayload) => {
-      Future.apply(animeList).foreach(anime => {
-        val season = anime.season
-        val year = anime.year
-        anime.anime.foreach(a => DatabaseConnector.updateItem(season, year, a))
+      Future.apply(animeList).foreach(payload => {
+        val season = payload.season
+        val year = payload.year
+        payload.anime.foreach(itemUpdate => DatabaseConnector.updateItem(season, year, itemUpdate))
       })
       Response.apply(Status.Ok)
     }

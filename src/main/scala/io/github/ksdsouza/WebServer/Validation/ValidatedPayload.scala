@@ -10,40 +10,29 @@ import org.mongodb.scala.model.Updates._
 
 import scala.collection.mutable.ArrayBuffer
 
-case class PUTAnime(title: String, numEps: String, imgUrl: String, release: String, synopsis: String, genres: Array[String]) {
+case class PUTAnime(title: String, numEps: String, imgUrl: String, release: String, synopsis: String,
+                    genres: Array[String]) {
   def asAnime = Anime.apply(this)
 }
 
-case class POSTAnime(title: String, numEps: Option[String], imgUrl: Option[String], release: Option[String], synopsis: Option[String], genres: Option[Array[String]]){
+case class POSTAnime(title: String, numEps: Option[String], imgUrl: Option[String], release: Option[String],
+                     synopsis: Option[String], genres: Option[Array[String]]){
   def asAnime = Anime.apply(this)
 
-  private def otherToSet(key: String, field: Option[String]) = if (field.isDefined) set(key, field.get) else null
-  private def listToSet(key: String, field: Option[Array[String]]) =
-    if (field.isDefined && field.get.size > 0) {
-      val f = field.get
-      f.foldRight(push(key,f.head))((current, accumulator) => combine(accumulator, push(key, current)))
-    }
-    else null
+  private def fieldToUpdateSet(key: String, field: Option[Any]) = field.getOrElse(None) match {
+    case textField: String => set(key, textField)
+    case arrayField: Array[String] if arrayField.length > 0 =>
+      arrayField.foldRight(push(key,arrayField.head))((current, accumulator) => combine(accumulator, push(key, current)))
+    case _ => null
+  }
 
-  def titleAsUpdate = set("title", title)
-
-  def numEpsAsUpdate = otherToSet("numEps", numEps)
-
-  def imgUrlAsUpdate = otherToSet("imgUrl", imgUrl)
-
-  def releaseAsUpdate = otherToSet("release", release)
-
-  def synopsisAsUpdate = otherToSet("synopsis", synopsis)
-
-  def genresAsUpdate = listToSet("genres", genres)
-
-  def getAllUpdates = {
-    val titleSet = titleAsUpdate
-    val numEpsSet = numEpsAsUpdate
-    val imgUrlSet = imgUrlAsUpdate
-    val releaseSet = releaseAsUpdate
-    val synopsisSet = synopsisAsUpdate
-    val genresSet = genresAsUpdate
+  def getAllUpdates: Bson = {
+    val titleSet = fieldToUpdateSet("title", Some(title))
+    val numEpsSet = fieldToUpdateSet("numEps", numEps)
+    val imgUrlSet = fieldToUpdateSet("imgUrl", imgUrl)
+    val releaseSet = fieldToUpdateSet("release", release)
+    val synopsisSet = fieldToUpdateSet("synopsis", synopsis)
+    val genresSet = fieldToUpdateSet("genres", genres)
 
     val updates = new ArrayBuffer[Bson]()
 
@@ -55,19 +44,18 @@ case class POSTAnime(title: String, numEps: Option[String], imgUrl: Option[Strin
       val arrayNode = new ObjectMapper().createArrayNode()
       genres.get.foreach(arrayNode.add)
       updates += set("genres", arrayNode.toString)
-//      updates += set("genres", genres.get)
     }
 
-    val r = updates.foldRight(titleSet)((current, accumulation) => combine(accumulation, current))
-    println(r)
-    r
+    val updateBSON = updates.foldRight(titleSet)((current, accumulation) => combine(accumulation, current))
+    println(updateBSON)
+    updateBSON
   }
 }
 
-case class PUTValidatedPayload(val season: String, val year: Int, val anime: Array[PUTAnime]) {
-  def asList = anime.toList
+case class PUTValidatedPayload(season: String, year: Int, anime: Array[PUTAnime]) {
+  def asList: List[Anime] = anime.toList.map(Anime.apply)
 }
 
 case class POSTValidatedPayload(season: String, year: Int, anime: Array[POSTAnime]) {
-  def asList = anime.toList
+  def asList: List[POSTAnime] = anime.toList
 }

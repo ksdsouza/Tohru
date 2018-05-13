@@ -2,11 +2,12 @@ package io.github.ksdsouza.WebServer
 
 import java.net.InetSocketAddress
 
-import com.twitter.app.App
+import com.twitter.app.{App, Flag}
 import com.twitter.finagle.Http
 import com.twitter.logging.Logging
 import com.twitter.server.{Admin, AdminHttpServer, Hooks, Stats}
 import com.twitter.util.Await
+import io.github.ksdsouza.WebServer.Util.PropertyReader
 
 object RestServer extends App
   with AdminHttpServer
@@ -15,31 +16,25 @@ object RestServer extends App
   with Admin
   with Logging {
 
-
-  val port = flag[Int]("port",8085, "port this server should use")
+  val port: Flag[Int] = flag[Int]("port", PropertyReader.MongoPort, "port this server should use")
 
   override def failfastOnFlagsNotParsed: Boolean = true
 
 
   def main() {
 
-//      val server = Http.server
-//          .withLabel("tohru")
-//          .serveAndAnnounce(
-//            name = "zk!127.0.0.1:2181!/service2/tohru!0",
-//            addr = new InetSocketAddress(8085),
-//            service = TohruAPI
-//          )
-    val server2 = Http.server.withLabel("tohru")
-        .serveAndAnnounce("zk!127.0.0.1:2181!/service2/tohru!0",
-          new InetSocketAddress(8085),
-          TohruAPI.service)
+    val server = Http.server.withLabel("tohru")
+        .serveAndAnnounce(
+          name = s"zk!${PropertyReader.ZKURL}:${PropertyReader.ZKPort}!/services/tohru!0",
+          addr = new InetSocketAddress(PropertyReader.ServicePort),
+          service = TohruAPI.service)
 
     onExit({
+      println("Stopping Service")
       TohruAPI.exit
     })
-    Await.ready(server2)
-  }
 
+    Await.ready(server)
+  }
 }
 

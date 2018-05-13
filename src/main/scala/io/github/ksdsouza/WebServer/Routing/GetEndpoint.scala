@@ -8,7 +8,9 @@ import io.finch.syntax._
 import io.github.ksdsouza.WebServer.Database.DatabaseConnector
 
 object GetEndpoint {
-  def getResponse(contentString: String, status: http.Status) = {
+  def endpoint = getAnimeSeason :+: getSeasons
+
+  def setResponse(contentString: String, status: http.Status): Response = {
     val response = http.Response.apply(status)
     response.setContentString(contentString)
     response
@@ -17,9 +19,17 @@ object GetEndpoint {
   val getAnimeSeason: Endpoint[Response] = get("services" :: "tohru" :: "fetch" :: param("season") :: param[Int]("year")) {
     (season: String, year: Int) => {
       DatabaseConnector.getCollection(season, year)
-        .map(_.foldRight(new ObjectMapper().createArrayNode)((doc, curr) => curr.add(doc)))
-        .map(_.toString).map(getResponse(_, http.Status.Ok))
+        .map(fetched => fetched.foldRight(new ObjectMapper().createArrayNode)((doc, jsonArray) => jsonArray.add(doc)))
+        .map(_.toString)
+        .map(setResponse(_, http.Status.Ok))
     }
   }
 
+  val getSeasons: Endpoint[Response] = get("services" :: "tohru" :: "list") {
+    () => {
+      DatabaseConnector.getCollectionNames().map(names => names.foldRight(new ObjectMapper().createArrayNode()) {
+        (currentName, responseJSON) => responseJSON.add(currentName)
+      }).map(responseJson => setResponse(responseJson.toString, http.Status.Ok))
+    }
+  }
 }
