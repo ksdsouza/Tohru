@@ -6,12 +6,16 @@ import com.twitter.util.{Future => TwitterFuture}
 import io.github.ksdsouza.WebServer.Util.{FutureConverter, PropertyReader}
 import io.github.ksdsouza.WebServer.Validation.{Anime, POSTAnime}
 import org.bson.conversions.Bson
+import org.mongodb.scala.model.UpdateOptions
 import org.mongodb.scala.{Completed, Document, MongoClient, MongoDatabase, _}
 import org.mongodb.scala.model.Updates._
+
 
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.{Try,Success,Failure}
 
 object DatabaseConnector {
   val mapper = new ObjectMapper()
@@ -33,13 +37,51 @@ object DatabaseConnector {
   def getCollectionNames(): TwitterFuture[Seq[String]] = FutureConverter.scalaToTwitterFuture(database.listCollectionNames().toFuture())
 
 
-  def addToDB(season: String, year: Int)(animeList: List[Anime]): Unit = {
-    val collection = database.getCollection(s"$season $year")
-    animeList.foreach(anime => {
-      val query = Document.apply("{\"title\":\"" + anime.title + "\"}")
-      collection.updateOne(query, Document.apply(anime.json.toString), model.UpdateOptions.apply.upsert(true))
-    })
+  def hasCollection(collectionName: String): Future[Boolean] = {
+    database.listCollectionNames().toFuture().map(collectionNames => collectionNames.exists(name => name.equals(collectionName)))
   }
+
+  def createCollection(collectionName: String): TwitterFuture[Completed] = {
+    FutureConverter.scalaToTwitterFuture(database.createCollection(collectionName).toFuture)
+  }
+
+  def addItemToCollection(anime: Anime, collection: MongoCollection[Document]): Unit = {
+    val query = Document.apply("{\"title\":\"" + anime.title + "\"}")
+    val doc = Document.apply(anime.json.toString)
+
+    collection.find(model.Filters.eq("title", anime.title)).toFuture().onComplete {
+      case Success(s) if s.nonEmpty=> {
+        println(s)
+        collection.replaceOne(query, doc).toFuture()
+      }
+
+      case Success(s) => {
+        collection.insertOne(doc).toFuture()
+      }
+      case Failure(p) => {
+        println(p)
+      }
+    }
+//    FutureConverter.scalaToTwitterFuture(collection.insertOne(Document.apply(anime.json.toString)).toFuture())
+//      .onSuccess(_ => println("Successfully added " + anime.title + " to collection"))
+  }
+
+  def addToDB(season: String, year: Int)(animeList: List[Anime]): Unit = {
+    val collectionName = s"$season $year"
+    hasCollection(collectionName).map(
+      collectionExists => {
+        if(collectionExists){
+          val collection = database.getCollection(s"$season $year")
+          animeList.foreach(anime => addItemToCollection(anime, collection))
+        }
+        else {
+          createCollection(collectionName).onSuccess(_ => addToDB(season, year)(animeList))
+        }
+      }
+    )
+  }
+
+
 
   def updateItem(season: String, year: Int, anime: POSTAnime): Unit = {
     val collection = database.getCollection(s"$season $year")
